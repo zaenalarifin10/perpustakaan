@@ -1,0 +1,216 @@
+Jika kamu menggunakan Laravel untuk aplikasi web perpustakaanmu, berikut adalah cara untuk mengimplementasikan sistem rating dengan bintang yang bisa di-refresh dan disimpan ke database. Langkah-langkah berikut mencakup setup Laravel, pembuatan model dan kontroler, serta frontend dengan Blade templates.
+
+1. Setup Laravel
+Pastikan kamu sudah memiliki proyek Laravel. Jika belum, kamu bisa membuatnya dengan perintah:
+
+bash
+Salin kode
+composer create-project --prefer-dist laravel/laravel library-rating
+2. Buat Migration dan Model untuk Rating
+a. Migration
+Buat migration untuk tabel ratings:
+
+bash
+Salin kode
+php artisan make:migration create_ratings_table
+Edit file migration di database/migrations:
+
+php
+Salin kode
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateRatingsTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('ratings', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('book_id');
+            $table->integer('rating');
+            $table->timestamps();
+            $table->unique(['book_id']);
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('ratings');
+    }
+}
+Jalankan migration:
+
+bash
+Salin kode
+php artisan migrate
+b. Model
+Buat model Rating:
+
+bash
+Salin kode
+php artisan make:model Rating
+Edit model di app/Models/Rating.php:
+
+php
+Salin kode
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Rating extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['book_id', 'rating'];
+}
+3. Buat Controller untuk Rating
+Buat controller RatingController:
+
+bash
+Salin kode
+php artisan make:controller RatingController
+Edit controller di app/Http/Controllers/RatingController.php:
+
+php
+Salin kode
+namespace App\Http\Controllers;
+
+use App\Models\Rating;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class RatingController extends Controller
+{
+    public function submit(Request $request)
+    {
+        $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'book_id' => 'required|integer',
+        ]);
+
+        $bookId = $request->input('book_id');
+        $rating = $request->input('rating');
+
+        // Insert or update rating
+        Rating::updateOrCreate(
+            ['book_id' => $bookId],
+            ['rating' => $rating]
+        );
+
+        // Calculate average rating
+        $averageRating = Rating::where('book_id', $bookId)->avg('rating');
+        $averageRating = round($averageRating, 1);
+
+        return response()->json(['average_rating' => $averageRating]);
+    }
+
+    public function show($bookId)
+    {
+        $averageRating = Rating::where('book_id', $bookId)->avg('rating');
+        $averageRating = round($averageRating, 1);
+
+        return view('book', compact('averageRating', 'bookId'));
+    }
+}
+4. Routing
+Tambahkan route di routes/web.php:
+
+php
+Salin kode
+use App\Http\Controllers\RatingController;
+
+Route::post('/rate', [RatingController::class, 'submit']);
+Route::get('/book/{bookId}', [RatingController::class, 'show']);
+5. Frontend dengan Blade
+Buat Blade template untuk menampilkan rating dan bintang di resources/views/book.blade.php:
+
+blade
+Salin kode
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rating Buku</title>
+    <link rel="stylesheet" href="{{ asset('css/styles.css') }}">
+</head>
+<body>
+    <h1>Rating Buku</h1>
+    <div id="rating-stars">
+        <span data-value="1" class="star">&#9733;</span>
+        <span data-value="2" class="star">&#9733;</span>
+        <span data-value="3" class="star">&#9733;</span>
+        <span data-value="4" class="star">&#9733;</span>
+        <span data-value="5" class="star">&#9733;</span>
+    </div>
+    <div id="average-rating">
+        Rata-rata Rating: <span id="rating-value">{{ $averageRating }}</span> / 5
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const stars = document.querySelectorAll('#rating-stars .star');
+            const ratingValue = document.getElementById('rating-value');
+            const bookId = "{{ $bookId }}";
+
+            stars.forEach(star => {
+                star.addEventListener('click', () => {
+                    const rating = star.getAttribute('data-value');
+
+                    fetch('/rate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ rating, book_id: bookId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update UI
+                        stars.forEach(s => s.classList.remove('selected'));
+                        star.classList.add('selected');
+                        ratingValue.textContent = data.average_rating;
+
+                        // Refresh the page to update rating
+                        location.reload();
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+6. CSS
+Tambahkan CSS di public/css/styles.css:
+
+css
+Salin kode
+body {
+    font-family: Arial, sans-serif;
+}
+
+#rating-stars {
+    display: flex;
+    font-size: 2em;
+}
+
+.star {
+    cursor: pointer;
+    color: gray;
+    transition: color 0.3s;
+}
+
+.star:hover,
+.star.selected {
+    color: gold;
+}
+Penjelasan
+Model dan Migration: Mengatur database dan model untuk rating.
+Controller: Mengatur logika penyimpanan rating dan perhitungan rata-rata.
+Routing: Menangani permintaan dari frontend.
+Blade Template: Menyediakan antarmuka pengguna untuk memberikan rating dan menampilkan rating rata-rata.
+JavaScript: Menangani klik bintang dan mengirim rating ke server.
+Dengan setup ini, pengguna dapat memberikan rating dengan mengklik bintang, dan rating akan disimpan ke database serta ditampilkan rata-ratanya di halaman buku.

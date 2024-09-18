@@ -1,0 +1,22 @@
+
+.product-stock {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Warna stok berdasarkan rentang */
+.stock-green {
+    color: #28a745; /* Hijau untuk stok >= 100 */
+}
+
+.stock-yellow {
+    color: #ffc107; /* Kuning untuk stok 50-99 */
+}
+
+.stock-orange {
+    color: #fd7e14; /* Oranye untuk stok 25-49 */
+}
+
+.stock-red {
+    color: #dc3545; /* Merah untuk stok < 25 */
+}/* Base card styling *
